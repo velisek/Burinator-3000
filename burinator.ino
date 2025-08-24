@@ -10,11 +10,10 @@ AsyncDelay d;
 AsyncDelay noiseCalibTimer;
 AsyncDelay ledFlashTimer;
 
-// Definice pinů pro 4 LED diody
-const uint8_t LED_1 = 0;  // D3, GPIO0
-const uint8_t LED_2 = 2;  // D4, GPIO2
-const uint8_t LED_3 = 12; // D6, GPIO12
-const uint8_t LED_4 = 13; // D7, GPIO13
+const uint8_t LED_RUN = 16;     // D0 = GPIO16 - externí LED indikace běhu
+const uint8_t LED_RED = 12;     // D6 = GPIO12 - červená složka RGB LED (PWM)
+const uint8_t LED_GREEN = 13;   // D7 = GPIO13 - zelená složka RGB LED (PWM)
+const uint8_t LED_BLUE = 15;    // D8 = GPIO15 - modrá složka RGB LED (PWM)
 
 bool ledState = false;
 
@@ -22,23 +21,10 @@ ICACHE_RAM_ATTR void int2Handler() {
   as3935.interruptHandler();
 }
 
-void readRegs(uint8_t start, uint8_t end) {
-  Serial.println(F("Reading registers:"));
-  for (uint8_t reg = start; reg < end; ++reg) {
-    delay(20);
-    uint8_t val;
-    if (as3935.readRegister(reg, val)) {
-      Serial.print(F("Reg 0x"));
-      Serial.print(reg, HEX);
-      Serial.print(F(": 0x"));
-      Serial.println(val, HEX);
-    } else {
-      Serial.print(F("Reg 0x"));
-      Serial.print(reg, HEX);
-      Serial.println(F(": read error"));
-    }
-  }
-  Serial.println(F("------------------"));
+void setRGBColorPWM(uint8_t red, uint8_t green, uint8_t blue) {
+  analogWrite(LED_RED, map(red, 0, 255, 0, 1023));
+  analogWrite(LED_GREEN, map(green, 0, 255, 0, 1023));
+  analogWrite(LED_BLUE, map(blue, 0, 255, 0, 1023));
 }
 
 void printInterruptReason(Stream &s, uint8_t flags, const char *prefix = nullptr) {
@@ -81,13 +67,6 @@ void autoCalibrateNoiseFloor() {
   Serial.println(bestFloor);
 }
 
-void turnOffAllLeds() {
-  digitalWrite(LED_1, LOW);
-  digitalWrite(LED_2, LOW);
-  digitalWrite(LED_3, LOW);
-  digitalWrite(LED_4, LOW);
-}
-
 void setup() {
 #ifdef JTD
   disableJTAG();
@@ -108,14 +87,17 @@ void setup() {
   as3935.setSpikeRejection(7);
 
   Serial.println(F("Sensor setup complete."));
-  readRegs(0, 0x09);
+  pinMode(LED_RUN, OUTPUT);
+  pinMode(LED_RED, OUTPUT);
+  pinMode(LED_GREEN, OUTPUT);
+  pinMode(LED_BLUE, OUTPUT);
 
-  pinMode(LED_1, OUTPUT);
-  pinMode(LED_2, OUTPUT);
-  pinMode(LED_3, OUTPUT);
-  pinMode(LED_4, OUTPUT);
+  // Vypnutí interní LED na GPIO2 (D4)
+  pinMode(2, OUTPUT);
+  digitalWrite(2, HIGH);
 
-  turnOffAllLeds();
+  digitalWrite(LED_RUN, LOW);
+  setRGBColorPWM(0, 0, 0);
 
   d.start(1000, AsyncDelay::MILLIS);
   noiseCalibTimer.start(60000, AsyncDelay::MILLIS);
@@ -133,25 +115,16 @@ void loop() {
       Serial.print(dist);
       Serial.println(F(" km"));
 
-      turnOffAllLeds();
-      if (dist > 15) {
-        digitalWrite(LED_1, HIGH);  // 1 LED
-      } else if (dist > 6) {
-        digitalWrite(LED_1, HIGH);
-        digitalWrite(LED_2, HIGH);  // 2 LED
-      } else if (dist > 5) {
-        digitalWrite(LED_1, HIGH);
-        digitalWrite(LED_2, HIGH);
-        digitalWrite(LED_3, HIGH);  // 3 LED
+      if (dist <= 5) {
+        setRGBColorPWM(255, 0, 0);
+      } else if (dist <= 15) {
+        setRGBColorPWM(255, 165, 0);
       } else {
-        digitalWrite(LED_1, HIGH);
-        digitalWrite(LED_2, HIGH);
-        digitalWrite(LED_3, HIGH);
-        digitalWrite(LED_4, HIGH);  // 4 LED
+        setRGBColorPWM(0, 255, 0);
       }
-
-      ledFlashTimer.start(5000, AsyncDelay::MILLIS);
+      ledFlashTimer.start(500, AsyncDelay::MILLIS);
     }
+    Serial.println(F("----"));
   }
 
   if (as3935.getBusError()) {
@@ -164,12 +137,14 @@ void loop() {
     noiseCalibTimer.start(60000, AsyncDelay::MILLIS);
   }
 
-  if (ledFlashTimer.isExpired()) {
-    turnOffAllLeds();
-    ledFlashTimer.start(0xFFFFFFFF, AsyncDelay::MILLIS);
+  if (d.isExpired()) {
+    ledState = !ledState;
+    digitalWrite(LED_RUN, ledState ? HIGH : LOW);
+    d.start(1000, AsyncDelay::MILLIS);
   }
 
-  if (d.isExpired()) {
-    d.start(1000, AsyncDelay::MILLIS);
+  if (ledFlashTimer.isExpired()) {
+    setRGBColorPWM(0, 0, 0);
+    ledFlashTimer.start(0xFFFFFFFF, AsyncDelay::MILLIS);
   }
 }
