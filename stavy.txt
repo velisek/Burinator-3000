@@ -1,0 +1,22 @@
+LED barva	Vzdálenost blesku (km)	Význam / Bezpečnostní zóna
+Červená	do 5 km	Nejvyšší riziko – okamžité nebezpečí, chránit se ihned (např. vyhledat úkryt)
+Oranžová	5 až 15 km	Střední riziko – bouřka je blízko, vhodné být ve střežených prostorách, sledovat vývoj
+Zelená	nad 15 km	Nízké riziko – bouřka je vzdálená, stále však pozorovat, být obezřetný
+Doporučené chování podle zón:
+Červená zóna do 5 km:
+Blesky v této vzdálenosti jsou velmi nebezpečné. Je vhodné okamžitě vyhledat bezpečné úkrytové místo (např. vnitřní prostory budov, auto). Výstup z přírody nebo otevřených prostor je na místě.
+
+Oranžová zóna 5–15 km:
+Bouřka je relativně blízko. Doporučuje se zpomalit venkovní aktivity a sledovat situaci. Připravit se na případný přesun do bezpečí.
+
+Zelená zóna nad 15 km:
+Bouřka je dostatečně daleko, bezpečnostní riziko je nízké, ale počasí se může rychle změnit. Dále sledovat aktuální situaci.
+
+Jak to integrovat do kódu detektoru s 3 LED:
+LED červená (např. GPIO16 / D0): rozsvítí se pokud vzdálenost ≤ 5 km
+
+LED oranžová (např. GPIO5 / D1): rozsvítí se pokud 6 km ≤ vzdálenost ≤ 15 km
+
+LED zelená (např. GPIO4 / D2): rozsvítí se pokud vzdálenost > 15 km
+
+Takový indikátor vám dá vizuální info o blízkosti a nebezpečnosti bouřky.
