@@ -6,11 +6,16 @@
 #endif
 
 AS3935 as3935;
-bool ledState = true;
 AsyncDelay d;
 AsyncDelay noiseCalibTimer;
 AsyncDelay ledFlashTimer;
-const uint8_t LED_PIN = 16; // D0 na ESP8266
+
+const uint8_t LED_RUN = 2;      // GPIO2 = D4 vestavěná LED
+const uint8_t LED_RED = 12;     // D6 - do 5 km
+const uint8_t LED_ORANGE = 13;  // D7 - 6 - 15 km
+const uint8_t LED_GREEN = 15;   // D8 - nad 15 km
+
+bool ledState = false;
 
 ICACHE_RAM_ATTR void int2Handler() {
   as3935.interruptHandler();
@@ -97,15 +102,19 @@ void setup() {
   Serial.println(F("Sensor setup complete."));
   readRegs(0, 0x09);
 
-  pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, ledState);
+  pinMode(LED_RUN, OUTPUT);
+  pinMode(LED_RED, OUTPUT);
+  pinMode(LED_ORANGE, OUTPUT);
+  pinMode(LED_GREEN, OUTPUT);
 
-  pinMode(LED_PIN, OUTPUT);
-  digitalWrite(LED_PIN, LOW); // LED zhasnutá
+  digitalWrite(LED_RUN, HIGH); // Vestavěnou LED vypneme (GPIO2 je aktivní LOW)
+  digitalWrite(LED_RED, LOW);
+  digitalWrite(LED_ORANGE, LOW);
+  digitalWrite(LED_GREEN, LOW);
 
   d.start(1000, AsyncDelay::MILLIS);
-  noiseCalibTimer.start(60000, AsyncDelay::MILLIS); // 60s kalibrace
-  ledFlashTimer.start(0xFFFFFFFF, AsyncDelay::MILLIS); // deaktivace časovače LED
+  noiseCalibTimer.start(60000, AsyncDelay::MILLIS);
+  ledFlashTimer.start(0xFFFFFFFF, AsyncDelay::MILLIS); // deaktivace LED časovače
 }
 
 void loop() {
@@ -118,8 +127,22 @@ void loop() {
       Serial.print(F("Distance to lightning: "));
       Serial.print(dist);
       Serial.println(F(" km"));
-      digitalWrite(LED_PIN, HIGH);  // Rozsvítit LED na D0
-      ledFlashTimer.start(500, AsyncDelay::MILLIS); // LED svítí 500 ms
+
+      // Rozsvítit příslušnou LED podle vzdálenosti
+      if (dist <= 5) {
+        digitalWrite(LED_RED, HIGH);
+        digitalWrite(LED_ORANGE, LOW);
+        digitalWrite(LED_GREEN, LOW);
+      } else if (dist <= 15) {
+        digitalWrite(LED_RED, LOW);
+        digitalWrite(LED_ORANGE, HIGH);
+        digitalWrite(LED_GREEN, LOW);
+      } else {
+        digitalWrite(LED_RED, LOW);
+        digitalWrite(LED_ORANGE, LOW);
+        digitalWrite(LED_GREEN, HIGH);
+      }
+      ledFlashTimer.start(500, AsyncDelay::MILLIS);
     }
     Serial.println(F("----"));
   }
@@ -134,14 +157,19 @@ void loop() {
     noiseCalibTimer.start(60000, AsyncDelay::MILLIS);
   }
 
-  if (ledFlashTimer.isExpired()) {
-    digitalWrite(LED_PIN, LOW);   // Zhasnout LED po 500ms
-    ledFlashTimer.start(0xFFFFFFFF, AsyncDelay::MILLIS); // deaktivace časovače LED
-  }
-
+  // Blikání vestavěné LED pro signalizaci běhu programu
   if (d.isExpired()) {
     ledState = !ledState;
-    digitalWrite(LED_BUILTIN, ledState);
+    // GPIO2 je aktivní LOW, tedy pro rozsvícení LED musíme psát LOW
+    digitalWrite(LED_RUN, ledState ? LOW : HIGH);
     d.start(1000, AsyncDelay::MILLIS);
+  }
+
+  // LED na externích pinech zhasne po 500ms
+  if (ledFlashTimer.isExpired()) {
+    digitalWrite(LED_RED, LOW);
+    digitalWrite(LED_ORANGE, LOW);
+    digitalWrite(LED_GREEN, LOW);
+    ledFlashTimer.start(0xFFFFFFFF, AsyncDelay::MILLIS);
   }
 }
