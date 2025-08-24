@@ -10,10 +10,10 @@ AsyncDelay d;
 AsyncDelay noiseCalibTimer;
 AsyncDelay ledFlashTimer;
 
-const uint8_t LED_RUN = 2;      // GPIO2 = D4 vestavěná LED
-const uint8_t LED_RED = 12;     // D6 - do 5 km
-const uint8_t LED_ORANGE = 13;  // D7 - 6 - 15 km
-const uint8_t LED_GREEN = 15;   // D8 - nad 15 km
+const uint8_t LED_RUN = 16;     // D0 = GPIO16 - indikace běhu programu
+const uint8_t LED_RED = 12;     // D6 - do 5 km (vysoké riziko)
+const uint8_t LED_ORANGE = 13;  // D7 - 6 až 15 km (střední riziko)
+const uint8_t LED_GREEN = 15;   // D8 - nad 15 km (nízké riziko)
 
 bool ledState = false;
 
@@ -107,14 +107,14 @@ void setup() {
   pinMode(LED_ORANGE, OUTPUT);
   pinMode(LED_GREEN, OUTPUT);
 
-  digitalWrite(LED_RUN, HIGH); // Vestavěnou LED vypneme (GPIO2 je aktivní LOW)
+  digitalWrite(LED_RUN, LOW);   // LED RUN zapnuta (GPIO16 aktivní HIGH)
   digitalWrite(LED_RED, LOW);
   digitalWrite(LED_ORANGE, LOW);
   digitalWrite(LED_GREEN, LOW);
 
   d.start(1000, AsyncDelay::MILLIS);
   noiseCalibTimer.start(60000, AsyncDelay::MILLIS);
-  ledFlashTimer.start(0xFFFFFFFF, AsyncDelay::MILLIS); // deaktivace LED časovače
+  ledFlashTimer.start(0xFFFFFFFF, AsyncDelay::MILLIS);
 }
 
 void loop() {
@@ -142,7 +142,7 @@ void loop() {
         digitalWrite(LED_ORANGE, LOW);
         digitalWrite(LED_GREEN, HIGH);
       }
-      ledFlashTimer.start(500, AsyncDelay::MILLIS);
+      ledFlashTimer.start(5000, AsyncDelay::MILLIS);
     }
     Serial.println(F("----"));
   }
@@ -157,15 +157,14 @@ void loop() {
     noiseCalibTimer.start(60000, AsyncDelay::MILLIS);
   }
 
-  // Blikání vestavěné LED pro signalizaci běhu programu
+  // Blink LED RUN pro signalizaci běhu programu
   if (d.isExpired()) {
     ledState = !ledState;
-    // GPIO2 je aktivní LOW, tedy pro rozsvícení LED musíme psát LOW
-    digitalWrite(LED_RUN, ledState ? LOW : HIGH);
+    digitalWrite(LED_RUN, ledState ? HIGH : LOW);
     d.start(1000, AsyncDelay::MILLIS);
   }
 
-  // LED na externích pinech zhasne po 500ms
+  // Zhasnutí LED indikujících blesk po 500 ms
   if (ledFlashTimer.isExpired()) {
     digitalWrite(LED_RED, LOW);
     digitalWrite(LED_ORANGE, LOW);
